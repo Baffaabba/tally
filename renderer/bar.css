@@ -1,0 +1,234 @@
+/* ---------------------------------------------------------------------------
+Tally — floating recorder bar
+Housing reads as a small piece of desk hardware: recessed counter window,
+a real tally lamp, two transport keys. Boldness is spent on the lamp only.
+--------------------------------------------------------------------------- */
+
+:root {
+--housing: #14161a;
+--housing-edge: #333941;
+--well: #0a0b0d;
+--glyph: #e6e9ee;
+--glyph-dim: #7d858f;
+--tally: #e5342a;
+--hold: #f0a030;
+
+--idle-opacity: 0.32;
+--live-opacity: 0.58;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+height: 100%;
+background: transparent;
+overflow: hidden;
+user-select: none;
+cursor: default;
+font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+
+.sr {
+position: absolute;
+width: 1px; height: 1px;
+overflow: hidden;
+clip-path: inset(50%);
+white-space: nowrap;
+}
+
+/* --- housing -------------------------------------------------------------- */
+
+.housing {
+-webkit-app-region: drag;
+display: flex;
+align-items: center;
+gap: 10px;
+height: 100%;
+padding: 0 8px 0 14px;
+
+background: linear-gradient(180deg, #1b1e24 0%, var(--housing) 62%, #0f1114 100%);
+border: 1px solid var(--housing-edge);
+border-radius: 30px;
+box-shadow:
+0 10px 28px rgba(0, 0, 0, 0.5),
+inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+opacity: var(--idle-opacity);
+transition: opacity 160ms ease;
+}
+
+.housing[data-state="recording"],
+.housing[data-state="held"],
+.housing[data-state="saving"] { opacity: var(--live-opacity); }
+
+/* Fully lit through the countdown — you are about to be on air and need to
+read the number without chasing the bar with the cursor. */
+.housing[data-state="arming"] { opacity: 1; }
+
+.housing:hover,
+.housing:focus-within { opacity: 1; }
+/* --- tally lamp (the signature) ------------------------------------------- */
+
+.lamp {
+flex: none;
+width: 14px; height: 14px;
+display: grid; place-items: center;
+border-radius: 50%;
+background: #05060700;
+box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.lamp-bulb {
+width: 8px; height: 8px;
+border-radius: 50%;
+background: #3a4048;
+transition: background 200ms ease, box-shadow 200ms ease;
+}
+
+.housing[data-state="recording"] .lamp-bulb {
+background: var(--tally);
+box-shadow: 0 0 9px 2px rgba(229, 52, 42, 0.75);
+animation: breathe 1.7s ease-in-out infinite;
+}
+
+.housing[data-state="arming"] .lamp-bulb {
+background: var(--tally);
+box-shadow: 0 0 9px 2px rgba(229, 52, 42, 0.55);
+animation: breathe 1s steps(2, jump-none) infinite;
+}
+
+.housing[data-state="held"] .lamp-bulb {
+background: var(--hold);
+box-shadow: 0 0 8px 1px rgba(240, 160, 48, 0.6);
+}
+
+.housing[data-state="saving"] .lamp-bulb {
+background: var(--glyph-dim);
+animation: breathe 1s ease-in-out infinite;
+}
+
+@keyframes breathe {
+0%, 100% { opacity: 1; }
+50% { opacity: 0.42; }
+}
+
+/* --- counter window ------------------------------------------------------- */
+
+.readout {
+flex: 1 1 auto;
+min-width: 0;
+display: flex;
+flex-direction: column;
+justify-content: center;
+gap: 1px;
+padding: 5px 10px;
+border-radius: 7px;
+background: var(--well);
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+.readout-time {
+font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+font-variant-numeric: tabular-nums;
+font-size: 15px;
+line-height: 1.05;
+letter-spacing: 0.4px;
+color: var(--glyph);
+display: block;
+transform-origin: left center;
+}
+
+.housing[data-state="idle"] .readout-time,
+.housing[data-state="saving"] .readout-time { color: var(--glyph-dim); }
+.housing[data-state="held"] .readout-time { color: var(--hold); }
+
+.housing[data-state="arming"] .readout-time {
+color: var(--tally);
+font-size: 22px;
+letter-spacing: 0;
+}
+
+/* One tick per second, matching the lamp. */
+.readout-time.beat { animation: tick 1s ease-out; }
+
+@keyframes tick {
+0% { transform: scale(1.22); opacity: 0.55; }
+22% { transform: scale(1); opacity: 1; }
+100% { transform: scale(1); opacity: 1; }
+}
+
+.readout-label {
+font-size: 8.5px;
+font-weight: 600;
+letter-spacing: 1.1px;
+text-transform: uppercase;
+color: var(--glyph-dim);
+}
+
+/* --- transport keys ------------------------------------------------------- */
+
+.transport { display: flex; gap: 3px; flex: none; }
+
+.key, .dismiss {
+-webkit-app-region: no-drag; /* without this the buttons are unclickable */
+flex: none;
+display: grid;
+place-items: center;
+border: 0;
+background: transparent;
+border-radius: 50%;
+cursor: pointer;
+color: var(--glyph);
+transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.key { width: 34px; height: 34px; }
+
+.key:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
+.key:active:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.key:disabled { color: #474d56; cursor: default; }
+
+.key:focus-visible, .dismiss:focus-visible {
+outline: 2px solid #6aa6ff;
+outline-offset: 1px;
+}
+.glyph { width: 17px; height: 17px; fill: currentColor; display: none; }
+
+#primary .glyph-rec { display: block; color: var(--tally); }
+.housing[data-state="recording"] #primary .glyph-rec,
+.housing[data-state="held"] #primary .glyph-rec { display: none; }
+.housing[data-state="recording"] #primary .glyph-stop,
+.housing[data-state="held"] #primary .glyph-stop { display: block; }
+
+#primary:disabled .glyph-rec { color: #5c3230; }
+
+#hold .glyph-pause { display: block; }
+.housing[data-state="held"] #hold .glyph-pause { display: none; }
+.housing[data-state="held"] #hold .glyph-play { display: block; color: var(--hold); }
+
+/* --- dismiss -------------------------------------------------------------- */
+
+.dismiss {
+width: 22px; height: 22px;
+color: var(--glyph-dim);
+opacity: 0;
+}
+
+.housing:hover .dismiss,
+.dismiss:focus-visible { opacity: 1; }
+
+.dismiss:hover { color: var(--glyph); background: rgba(255, 255, 255, 0.09); }
+
+.dismiss svg {
+width: 12px; height: 12px;
+stroke: currentColor; stroke-width: 2; stroke-linecap: round; fill: none;
+}
+
+/* --- accessibility -------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+.housing, .key, .dismiss, .lamp-bulb { transition: none; }
+.housing[data-state="recording"] .lamp-bulb,
+.housing[data-state="arming"] .lamp-bulb,
+.housing[data-state="saving"] .lamp-bulb { animation: none; }
+.readout-time.beat { animation: none; }
+}
