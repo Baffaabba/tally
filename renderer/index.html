@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy"
+content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;" />
+<title>Tally</title>
+<link rel="stylesheet" href="bar.css" />
+</head>
+<body>
+<div class="housing" id="housing" data-state="idle">
+
+<div class="lamp" aria-hidden="true"><span class="lamp-bulb"></span></div>
+
+<div class="readout">
+<span class="readout-time" id="time">00:00:00</span>
+<span class="readout-label" id="label">Ready</span>
+</div>
+
+<div class="transport">
+<button class="key key-primary" id="primary" type="button" title="Start recording">
+<svg viewBox="0 0 24 24" class="glyph glyph-rec" aria-hidden="true">
+<circle cx="12" cy="12" r="7" />
+</svg>
+<svg viewBox="0 0 24 24" class="glyph glyph-stop" aria-hidden="true">
+<rect x="6" y="6" width="12" height="12" rx="2" />
+</svg>
+<span class="sr">Start recording</span>
+</button>
+
+<button class="key" id="hold" type="button" title="Pause" disabled>
+<svg viewBox="0 0 24 24" class="glyph glyph-pause" aria-hidden="true">
+<rect x="7" y="5" width="3.6" height="14" rx="1.2" />
+<rect x="13.4" y="5" width="3.6" height="14" rx="1.2" />
+</svg>
+<svg viewBox="0 0 24 24" class="glyph glyph-play" aria-hidden="true">
+<path d="M8 5.5v13l11-6.5z" />
+</svg>
+<span class="sr">Pause</span>
+</button>
+</div>
+
+<button class="dismiss" id="dismiss" type="button" title="Close Tally">
+<svg viewBox="0 0 24 24" aria-hidden="true">
+<path d="M7 7l10 10M17 7L7 17" />
+</svg>
+<span class="sr">Close Tally</span>
+</button>
+
+</div>
+<script src="bar.js"></script>
+</body>
+</html>
