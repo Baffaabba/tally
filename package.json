@@ -1,0 +1,61 @@
+{
+    "name": "tally",
+    "version": "0.1.0",
+    "description": "Floating always-on-top screen recorder bar for Windows",
+    "main": "main.js",
+    "scripts": {
+          "start": "electron .",
+          "build": "electron-builder --win nsis"
+    },
+    "devDependencies": {
+          "electron": "^31.0.0",
+          "electron-builder": "^24.13.3"
+    },
+    "dependencies": {
+          "ffmpeg-static": "^5.2.0"
+    },
+    "build": {
+          "appId": "com.baffa.tally",
+          "productName": "Tally",
+          "files": [
+                  "main.js",
+                  "preload.js",
+                  "remux.js",
+                  "renderer/**/*",
+                  "!build/**"
+          ],
+          "asarUnpack": [
+                  "node_modules/ffmpeg-static/**"
+          ],
+          "win": {
+                  "target": [
+                            {
+                                        "target": "nsis",
+                                        "arch": [
+                                                      "x64"
+                                        ]
+                            },
+                            {
+                                        "target": "portable",
+                                        "arch": [
+                                                      "x64"
+                                        ]
+                            }
+                  ]
+          },
+          "nsis": {
+                  "oneClick": false,
+                  "allowToChangeInstallationDirectory": true,
+                  "artifactName": "Tally-setup-${version}.exe",
+                  "shortcutName": "Tally",
+                  "createDesktopShortcut": true
+          },
+          "portable": {
+                  "artifactName": "Tally-portable-${version}.exe"
+          },
+          "compression": "maximum"
+    },
+    "author": {
+          "name": "Baffa"
+    }
+}
