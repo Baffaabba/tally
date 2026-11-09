@@ -14,6 +14,12 @@ contextBridge.exposeInMainWorld('tally', {
     abort: () => ipcRenderer.invoke('recording:abort')
   },
 
+  onHover: (fn) => {
+    const handler = (_e, inside) => fn(inside);
+    ipcRenderer.on('bar:hover', handler);
+    return () => ipcRenderer.removeListener('bar:hover', handler);
+  },
+
   onProgress: (fn) => {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('recording:progress', handler);

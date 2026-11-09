@@ -36,6 +36,7 @@ Change the length with `COUNTDOWN_FROM` at the top of the countdown section in `
 - Always on top at the screen-saver level, so it survives fullscreen apps.
 - Hidden from capture via `setContentProtection(true)` — the bar does not appear in its own recording, or in Teams/OBS.
 - Transparency: 32% at rest, 58% during a take, 100% while counting in or on hover. Done in CSS so the window stays hit-testable.
+- Hover covers the whole bar, timer included. The bar is a drag region, and Windows drag regions swallow mouse events, so CSS `:hover` alone only fires over the buttons; the main process polls the cursor position instead and tells the bar when it is over it.
 - Draggable anywhere except the buttons, which carry `-webkit-app-region: no-drag`. Position persists in `%APPDATA%/tally/bar-position.json`, with an off-screen check so an unplugged monitor doesn't strand the bar.
 ## How the recording path works
 
@@ -78,6 +79,10 @@ npm_config_platform=win32 npm_config_arch=x64 node node_modules/ffmpeg-static/in
 ```
 
 `asarUnpack` in package.json keeps that binary executable inside the package. Along with Electron itself it makes up most of the ~145 MB installer. The portable build uses maximum compression and takes far longer to produce than the installer (20+ minutes on a laptop).
+
+## Icon
+
+`build/icon.ico` (16–256 px) is the app icon electron-builder puts on the exe, installer and shortcuts; `build/icon.png` is a 512 px copy. Both are drawn by `scripts/make-icon.js` — the bar's dark housing with the lit tally lamp — so tweak the colours or proportions there and run `node scripts/make-icon.js` to regenerate.
 
 ## The name
 

@@ -66,6 +66,7 @@ read the number without chasing the bar with the cursor. */
 .housing[data-state="arming"] { opacity: 1; }
 
 .housing:hover,
+.housing.hovered,
 .housing:focus-within { opacity: 1; }
 /* --- tally lamp (the signature) ------------------------------------------- */
 
@@ -230,6 +231,7 @@ opacity: 0;
 }
 
 .housing:hover .dismiss,
+.housing.hovered .dismiss,
 .dismiss:focus-visible { opacity: 1; }
 
 .dismiss:hover { color: var(--glyph); background: rgba(255, 255, 255, 0.09); }

@@ -538,6 +538,10 @@ if (recorder && recorder.state !== 'inactive') recorder.stop();
 releaseStream();
 });
 
+// Main tracks the cursor over the whole bar (see main.js for why CSS :hover
+// is not enough on a drag region).
+window.tally.onHover((inside) => housing.classList.toggle('hovered', inside));
+
 // ffmpeg reports how far through the file it is while saving.
 window.tally.onProgress(({ seconds, reencoding }) => {
 if (state !== 'saving') return;

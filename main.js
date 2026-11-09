@@ -263,7 +263,23 @@ let saveTimer = null;
     saveTimer = setTimeout(savePosition, 400);
   });
 
-win.on('closed', () => { win = null; });
+// Hover. The housing is a drag region, and on Windows drag regions swallow
+// mouse events, so CSS :hover only ever fires over the buttons, never over
+// the counter or the body of the bar. Track the cursor here instead and tell
+// the renderer when it is anywhere over the window.
+let hovered = false;
+const hoverTimer = setInterval(() => {
+  if (!win || win.isDestroyed()) return;
+  const { x, y } = screen.getCursorScreenPoint();
+  const b = win.getBounds();
+  const inside = x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height;
+  if (inside !== hovered) {
+    hovered = inside;
+    win.webContents.send('bar:hover', inside);
+  }
+}, 80);
+
+win.on('closed', () => { clearInterval(hoverTimer); win = null; });
 }
 
 // ---------------------------------------------------------------------------
