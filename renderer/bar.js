@@ -5,6 +5,7 @@ const timeEl = document.getElementById('time');
 const labelEl = document.getElementById('label');
 const primary = document.getElementById('primary');
 const hold = document.getElementById('hold');
+const mic = document.getElementById('mic');
 const dismiss = document.getElementById('dismiss');
 
 const STATES = {
@@ -62,6 +63,9 @@ primary.disabled = next === 'saving';
 hold.title = cfg.holdTitle;
 hold.querySelector('.sr').textContent = cfg.holdTitle;
 hold.disabled = !cfg.holdEnabled;
+
+// The audio sources are fixed once the screen is grabbed.
+mic.disabled = next !== 'idle';
 }
 
 function resetCounter() {
@@ -98,8 +102,99 @@ return MIME_PREFERENCE.find((t) => MediaRecorder.isTypeSupported(t)) || '';
 }
 
 let recorder = null;
-let stream = null;
+let stream = null; // the display capture (video + system audio)
+let micStream = null; // microphone, only when narration is on
+let audioCtx = null; // mixes system audio and mic into one track
+let micAnalyser = null;
+let meterFrame = 0;
 let lastFile = null;
+
+// System audio is program output (music, video, app sounds), not a voice.
+// Chromium's voice clean-up treats a steady sound as noise and fades it out
+// within a few seconds, and collapses stereo to mono. Turn all of it off.
+const SYSTEM_AUDIO = {
+echoCancellation: false,
+noiseSuppression: false,
+autoGainControl: false,
+channelCount: 2
+};
+
+// The mic is a voice, so the clean-up is wanted there. Echo cancellation
+// cannot remove what other apps play through the speakers, so narrating over
+// loud system audio on open speakers will still record some of it twice.
+const MIC_AUDIO = {
+echoCancellation: true,
+noiseSuppression: true,
+autoGainControl: true
+};
+
+// --- microphone toggle -------------------------------------------------------
+
+const MIC_KEY = 'tally.mic';
+let micOn = false;
+try { micOn = localStorage.getItem(MIC_KEY) === 'on'; } catch { /* default off */ }
+
+function paintMic() {
+mic.setAttribute('aria-pressed', String(micOn));
+const t = micOn ? 'Microphone on — click to record system audio only' : 'Microphone off — click to add narration';
+mic.title = t;
+mic.querySelector('.sr').textContent = t;
+}
+
+function setMic(on) {
+micOn = on;
+try { localStorage.setItem(MIC_KEY, on ? 'on' : 'off'); } catch { /* not persisted */ }
+paintMic();
+}
+
+/** Drives the level ring on the mic key so you can see you are being heard. */
+function startMeter() {
+if (!micAnalyser) return;
+const buf = new Float32Array(micAnalyser.fftSize);
+const draw = () => {
+micAnalyser.getFloatTimeDomainData(buf);
+let sum = 0;
+for (const v of buf) sum += v * v;
+const rms = Math.sqrt(sum / buf.length);
+// -60 dBFS .. -10 dBFS mapped to 0..1
+const level = Math.max(0, Math.min(1, (20 * Math.log10(rms + 1e-9) + 60) / 50));
+mic.style.setProperty('--mic-level', level.toFixed(3));
+meterFrame = requestAnimationFrame(draw);
+};
+draw();
+}
+
+function stopMeter() {
+cancelAnimationFrame(meterFrame);
+meterFrame = 0;
+mic.style.setProperty('--mic-level', '0');
+}
+
+/**
+ * The stream the recorder actually sees. Without narration that is just the
+ * display capture. With it, system audio and mic are mixed through Web Audio
+ * into a single stereo track (MediaRecorder only records one audio track).
+ */
+function buildRecordStream() {
+if (!micStream) return stream;
+
+audioCtx = new AudioContext({ sampleRate: 48000 });
+const dest = audioCtx.createMediaStreamDestination();
+dest.channelCount = 2;
+
+const sys = stream.getAudioTracks();
+if (sys.length) audioCtx.createMediaStreamSource(new MediaStream(sys)).connect(dest);
+
+const micSource = audioCtx.createMediaStreamSource(micStream);
+micSource.connect(dest); // mono mic lands in the centre of the stereo mix
+
+micAnalyser = audioCtx.createAnalyser();
+micAnalyser.fftSize = 1024;
+micSource.connect(micAnalyser);
+
+audioCtx.resume().catch(() => {});
+return new MediaStream([...stream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+}
 
 // ondataavailable fires while a previous chunk may still be in flight. This
 // chain keeps writes strictly ordered without buffering video in memory.
@@ -131,7 +226,7 @@ const mime = pickMime();
 try {
 stream = await navigator.mediaDevices.getDisplayMedia({
 video: { frameRate: 30 },
-audio: true
+audio: SYSTEM_AUDIO
 });
 } catch (err) {
 // The user cancelled, or no screen source came back.
@@ -140,6 +235,19 @@ console.error(err);
 flash('No screen source');
 }
 return false;
+}
+
+if (micOn) {
+try {
+micStream = await navigator.mediaDevices.getUserMedia({ audio: MIC_AUDIO, video: false });
+} catch (err) {
+// Refuse rather than silently record without the narration you expect.
+// Usually Windows Settings > Privacy > Microphone, or no mic plugged in.
+console.error('Microphone unavailable:', err);
+releaseStream();
+flash('Mic unavailable', 6000);
+return false;
+}
 }
 
 writeChain = Promise.resolve();
@@ -155,7 +263,7 @@ return false;
 }
 
 try {
-recorder = new MediaRecorder(stream, {
+recorder = new MediaRecorder(buildRecordStream(), {
 mimeType: mime || undefined,
 videoBitsPerSecond: 8_000_000,
 audioBitsPerSecond: 128_000
@@ -190,6 +298,7 @@ if (state === 'arming') armAbort = true;
 else if (state === 'recording' || state === 'held') finish();
 });
 
+startMeter();
 return true;
 }
 
@@ -226,10 +335,20 @@ return recorder.state === 'recording';
 }
 
 function releaseStream() {
+stopMeter();
 if (stream) {
 stream.getTracks().forEach((t) => t.stop());
 stream = null;
 }
+if (micStream) {
+micStream.getTracks().forEach((t) => t.stop());
+micStream = null;
+}
+if (audioCtx) {
+audioCtx.close().catch(() => {});
+audioCtx = null;
+}
+micAnalyser = null;
 recorder = null;
 }
 
@@ -324,7 +443,12 @@ startTicker();
 }
 
 function freezeCounter() {
-if (state === 'recording') elapsedMs += performance.now() - segmentStart;
+if (state === 'recording') {
+elapsedMs += performance.now() - segmentStart;
+// Banked. Without this, paintTime() below (state is still 'recording')
+// adds the same stretch again and the paused readout shows double.
+segmentStart = performance.now();
+}
 stopTicker();
 paintTime();
 }
@@ -360,6 +484,7 @@ resetCounter();
 setState('idle');
 flash('Save failed', 6000);
 }
+if (closeAfterSave) window.tally.close();
 }
 // ---------------------------------------------------------------------------
 // Wiring
@@ -371,12 +496,25 @@ else if (state === 'arming') armAbort = true;
 else if (state === 'recording' || state === 'held') finish();
 });
 
+mic.addEventListener('click', () => {
+if (state === 'idle') setMic(!micOn);
+});
+
 hold.addEventListener('click', () => {
 if (state === 'recording') suspend();
 else if (state === 'held') resume();
 });
 
+let closeAfterSave = false;
+
 dismiss.addEventListener('click', async () => {
+if (state === 'saving') {
+// Quitting now would kill ffmpeg half way through the MP4. finish() is
+// already running; close as soon as it lands.
+closeAfterSave = true;
+labelEl.textContent = 'Closing after save';
+return;
+}
 if (state === 'arming') {
 armAbort = true;
 await captureDisarm(); // otherwise the temp file is orphaned
@@ -411,6 +549,7 @@ timeEl.textContent = format(seconds * 1000);
 
 setState('idle');
 resetCounter();
+paintMic();
 
 window.tally.probeFfmpeg().then((r) => {
 if (!r.ok) flash('ffmpeg missing', 8000);

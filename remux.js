@@ -45,6 +45,9 @@ function remuxToMp4(input, output, { copyVideo = true, onProgress } = {}) {
 
                      const args = [
                        '-y',
+                       // MediaRecorder output can carry gaps in its timestamps
+                       // (pauses). Input-side option: after -i it is ignored.
+                       '-fflags', '+genpts',
                        '-i', input,
                        ...video,
                        '-c:a', 'aac',
@@ -52,7 +55,6 @@ function remuxToMp4(input, output, { copyVideo = true, onProgress } = {}) {
                        // MediaRecorder writes no duration header and timestamps start wherever
                        // the first chunk landed. These pin them back to zero.
                        '-avoid_negative_ts', 'make_zero',
-                       '-fflags', '+genpts',
                        // Lets a player start before the whole file is buffered.
                        '-movflags', '+faststart',
                        output

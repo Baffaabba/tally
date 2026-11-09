@@ -1,6 +1,6 @@
 # Tally
 
-Floating always-on-top screen recorder for Windows. Records the whole primary display with system audio, counts you in for 3 seconds, and writes an MP4 straight into Downloads.
+Floating always-on-top screen recorder for Windows. Records the whole primary display with system audio — and, if you switch it on, your microphone for narration — counts you in for 3 seconds, and writes an MP4 straight into Downloads.
 
 ## Install
 
@@ -18,9 +18,10 @@ Neither is code-signed, so Windows SmartScreen will show "Windows protected your
 | ● Record | Grabs the screen, counts 3 → 2 → 1, then rolls. |
 | ■ Cancel | During the countdown, abandons the take. Escape does the same. |
 | ⏸ Pause / ▶ Resume | Suspends the stream; the counter freezes. |
+| 🎙 Mic | Before a take: adds your microphone as narration on top of system audio. Slashed and dim = off, bright = on. Remembered between sessions. During the take a green ring around it moves with your voice so you can see you're being heard. |
 | ■ Stop | Ends the take, converts, saves to Downloads. |
 | Space | Toggles pause while a take is live. |
-| × | Closes. Finishes an in-progress take first. |
+| × | Closes. Finishes an in-progress take first; if a save is already running, closes once it lands. |
 
 The lamp is red while recording, amber while paused, grey while saving. It blinks once per second through the countdown, in step with the number.
 
@@ -42,6 +43,12 @@ Change the length with `COUNTDOWN_FROM` at the top of the countdown section in `
 - `MediaRecorder` emits a chunk every second. Each chunk goes over IPC and is appended to a temp file immediately — video never accumulates in renderer memory, so a two-hour take costs no more RAM than a two-minute one. A promise chain keeps the writes ordered.
 - On stop, ffmpeg converts the temp file into `Downloads/Screen recording YYYY-MM-DD HHMMSS.mp4`. Collisions get `(2)`.
 
+## Audio
+
+- **System audio** (whatever the speakers are playing) is always recorded, in stereo, with Chromium's voice processing (noise suppression, auto gain, echo cancellation) switched off. Left on, those filters treat steady sound such as music as noise and fade it out within seconds.
+- **Microphone** is optional (the mic key). When on, the mic gets the voice clean-up and is mixed with system audio through Web Audio into one stereo track, since MediaRecorder records only one audio track. If the mic cannot be opened, the take does not start and the bar says "Mic unavailable" — check Windows Settings → Privacy & security → Microphone → "Let desktop apps access your microphone".
+- Narrating over loud system audio on open speakers records some of that audio twice (once directly, once through the mic). Use headphones for clean narration over music or video.
+
 ## Why H.264 and not VP9
 
 The recorder asks for `video/webm;codecs=h264,opus` first. That lets ffmpeg stream-copy the video (`-c:v copy`) into MP4 — no re-encode, seconds for a long recording. Only the audio is transcoded to AAC, because Opus in an MP4 container has the same poor-playback problem H.264 solves for video.
@@ -52,11 +59,15 @@ If ffmpeg fails outright, the raw `.webm` is copied to Downloads rather than dis
 
 ## Building it yourself
 
+Needs Node.js 22.12 or newer.
+
 ```
 npm install
 npm start   # run from source
 npm run build   # installer + portable into dist/
 ```
+
+Electron fetches its runtime (about 130 MB) the first time `npm start` runs, not during `npm install`, so the first launch takes a while. If that download is interrupted, Electron says "failed to install correctly"; delete `node_modules/electron`, run `npm install`, then `npx install-electron --no` to fetch it again.
 
 Building on Windows needs nothing extra. On Linux, electron-builder shells out to Wine for the NSIS steps — install `wine64` and `wine32:i386`, or the build stops after `dist/win-unpacked`.
 
@@ -66,7 +77,7 @@ Building on Windows needs nothing extra. On Linux, electron-builder shells out t
 npm_config_platform=win32 npm_config_arch=x64 node node_modules/ffmpeg-static/install.js
 ```
 
-`asarUnpack` in package.json keeps that binary executable inside the package. It is most of the 95 MB.
+`asarUnpack` in package.json keeps that binary executable inside the package. Along with Electron itself it makes up most of the ~145 MB installer. The portable build uses maximum compression and takes far longer to produce than the installer (20+ minutes on a laptop).
 
 ## The name
 

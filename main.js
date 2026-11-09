@@ -7,7 +7,7 @@ const os = require('os');
 
 const { remuxToMp4, probeFfmpeg } = require('./remux');
 
-const BAR_WIDTH = 264;
+const BAR_WIDTH = 300; // room for record, pause and mic keys
 const BAR_HEIGHT = 60;
 const MARGIN = 24;
 
@@ -120,12 +120,21 @@ function uniquePath(dir, base, ext) {
     fs.mkdirSync(dir, { recursive: true });
 
                  const target = path.join(dir, `take-${Date.now()}.webm`);
+    const stream = fs.createWriteStream(target);
     sink = {
       path: target,
-      stream: fs.createWriteStream(target),
+      stream,
       bytes: 0,
-      mime: mime || ''
+      mime: mime || '',
+      error: null
     };
+    // Without a listener a write error (disk full, temp folder removed) is
+    // an uncaught exception that takes the whole app down mid-take. Park it
+    // and let the next chunk report it to the renderer instead.
+    stream.on('error', (err) => {
+      console.error('Temp file write failed:', err);
+      if (sink && sink.stream === stream) sink.error = err;
+    });
     return { path: target };
   });
 
@@ -133,12 +142,26 @@ function uniquePath(dir, base, ext) {
 // ordering and natural backpressure, which a fire-and-forget send does not.
 ipcMain.handle('recording:chunk', async (_e, buffer) => {
   if (!sink) return { bytes: 0 };
+  if (sink.error) throw sink.error;
 
                const data = Buffer.from(buffer);
   sink.bytes += data.length;
 
-               if (!sink.stream.write(data)) {
-                 await new Promise((resolve) => sink.stream.once('drain', resolve));
+               const { stream } = sink;
+               if (!stream.write(data)) {
+                 // Also settle on error/close, or a failed disk leaves this
+                 // waiting for a 'drain' that never comes.
+                 await new Promise((resolve) => {
+                   const done = () => {
+                     stream.off('drain', done);
+                     stream.off('error', done);
+                     stream.off('close', done);
+                     resolve();
+                   };
+                   stream.on('drain', done);
+                   stream.on('error', done);
+                   stream.on('close', done);
+                 });
                }
   return { bytes: sink.bytes };
 });
@@ -147,7 +170,10 @@ ipcMain.handle('recording:abort', async () => {
   if (!sink) return;
   const { stream, path: p } = sink;
   sink = null;
-  await new Promise((resolve) => stream.end(resolve));
+  await new Promise((resolve) => {
+    stream.once('error', resolve);
+    stream.end(resolve);
+  });
   fs.promises.unlink(p).catch(() => {});
 });
 

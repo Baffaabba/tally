@@ -205,6 +205,22 @@ outline-offset: 1px;
 .housing[data-state="held"] #hold .glyph-pause { display: none; }
 .housing[data-state="held"] #hold .glyph-play { display: block; color: var(--hold); }
 
+/* --- microphone ----------------------------------------------------------- */
+
+#mic { --mic-level: 0; color: var(--glyph-dim); }
+#mic .glyph-mic { display: block; }
+#mic .mic-stand, #mic .mic-slash {
+fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round;
+}
+#mic[aria-pressed="true"] { color: var(--glyph); }
+#mic[aria-pressed="true"] .mic-slash { display: none; }
+#mic[aria-pressed="true"]:disabled { color: var(--glyph); cursor: default; }
+
+/* Live level during a take: the ring swells with your voice. */
+.housing:not([data-state="idle"]) #mic[aria-pressed="true"] {
+box-shadow: 0 0 0 calc(1px + var(--mic-level) * 3px) rgba(80, 200, 120, calc(0.25 + var(--mic-level) * 0.6));
+}
+
 /* --- dismiss -------------------------------------------------------------- */
 
 .dismiss {
